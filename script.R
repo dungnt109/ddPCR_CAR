@@ -23,12 +23,8 @@ cat(paste(silence, "\n"))
 # 1. increase niqr
 # 2. decrease quantile.range
 # suggested default: 
-#niqr <- 3
-#quantile.range <- 0.02
-
-# the parameters below may not sensitive
-niqr <- 5
-quantile.range <- 0.005
+niqr <- 3
+quantile.range <- 0.02
 
 
 show_outliers <- TRUE
@@ -105,44 +101,39 @@ manual_clustering_and_threshold <- function(intensities, threshold) {
 
 
 ##### load sample sheet
-sample_sheet_file <- "/home/dungnt/Documents/Repository/ddPCR_MRD/D1584/D1584c.txt"
+sample_sheet_file <- "/home/dungnt/Documents/Repository/ddPCR_CAR/D1593Bd CAR19/layout.txt"
 
 folder <- dirname(sample_sheet_file)
 
-cat("Do you want to perform absolute or relative MRD?\n1. Absolute\n2. Relative\n")
+runType = "absolute"
 
-answer <- readLines("stdin",n=1)
-
-runType <- switch(
-	answer, 
-	"1" = "absolute",
-	"2" = "relative", 
-	"relative")
-
-cat("\nVerified by?\n1. Prof Allen Yeoh\n2. Blank\n")
+cat("\nVerified by?\n1. Prof Allen Yeoh\n2. Dr Lu Yi\n3. Blank\n")
 answer <- readLines("stdin",n=1)
 
 
 verifier <- switch(
 	answer, 
 	"1" = "Prof Allen Yeoh",
-	"2" = "", 
+	"2" = "Dr Lu Yi", 
+	"3" = "",
 	answer)
 
-cat("\nRun by?\n1. Amanda Lee\n2. Huan Pei Tee\n3. Nurhilya\n4. Others\n5. Blank\n")
+cat("\nRun by?\n1. Amanda Lee\n2. Huan Pei Tee\n3. Nurhilya\n4. Dr Lu Yi\n5. Others\n6. Blank\n")
 answer <- readLines("stdin",n=1)
 
 if (answer == "4"){
 	cat("\nPlease specify:\n")
 	run_by <- readLines("stdin",n=1)
 } else {
-	run_by <- switch(
-		answer, 
-		"1" = "Amanda Lee", 
-		"2" = "Huan Pei Tee", 
-		"3" = "Nurhilya", 
-		"5" = "", 
-		answer 
+		run_by <- switch(
+			answer, 
+			"1" = "Amanda Lee", 
+			"2" = "Huan Pei Tee", 
+			"3" = "Nurhilya", 
+			"4" = "Dr Lu Yi",
+			"5" = "Others",
+			"6" = "", 
+			answer 
 		)
 }
 
@@ -156,7 +147,7 @@ run_date <- switch(
 	answer 
 	)
 
-cat("\nReported by?\n1. Shirley Kham\n2. Huan Pei Tee\n3. Nurhilya\n4. Others\n5. Blank\n")
+cat("\nReported by?\n1. Shirley Kham\n2. Huan Pei Tee\n3. Nurhilya\n4. Dr Lu Yi\n5. Others\n6. Blank\n")
 answer <- readLines("stdin",n=1)
 
 if (answer == "4"){
@@ -169,7 +160,9 @@ if (answer == "4"){
 		"1" = "Shirley Kham", 
 		"2" = "Huan Pei Tee", 
 		"3" = "Nurhilya", 
-		"5" = "", 
+		"4" = "Dr Lu Yi", 
+		"5" = "Others",
+		"6" = "", 
 		answer 
 		)
 }
@@ -193,7 +186,7 @@ if (runmode == "interactive"){
 
 	if (is_manual_threshold){
 
-		cat("\nPlease key in the marker assay's intensities threshold!\n")
+		cat("\nPlease key in the CAR assay's intensities threshold!\n")
 
 		manual_threshold = as.numeric(trimws(readLines("stdin",n=1)))
 
@@ -202,6 +195,20 @@ if (runmode == "interactive"){
 }
 
 cat(paste("Analyzing sample sheet", sample_sheet_file, "\n", sep=""))
+
+
+
+cat("Please key in the CAR/ALB baseline ratio in MNC, or press Enter to use the calculated value from the test.\n")
+
+mnc_baseline <- trimws(readLines("stdin",n=1))
+mnc_baseline <- as.numeric(mnc_baseline)
+
+if (is.na(mnc_baseline)) {
+	manual_mnc_baseline <- FALSE 
+} else {
+	manual_mnc_baseline <- TRUE
+}
+
 
 
 cat("Please key in the MNC dilution factor or hit enter to use the default value (200x).\n")
@@ -279,8 +286,21 @@ h2o.alb.int <- read.csv(h2o.alb.file, header=TRUE)
 h2o.alb.int <- h2o.alb.int[sample(nrow(h2o.alb.int)), ]
 
 
+
+### get QC list
+qc.marker.samples <- samples[grepl("^QC_CAR_", samples)]                                #
+qc.marker.files <- paste(folder, files[names(qc.marker.samples)], sep=separator)
+qc.sample.sid <- sapply(strsplit(qc.marker.samples, "_", fixed=TRUE), "[[", 3)
+qc.sample.pid <- sapply(qc.sample.sid, function(x) {
+	reg <- regexpr("[A-Z]+[0-9]+", x)
+	substring(x, reg[1], reg[1] + attr(reg, "match.length")[1] - 1)
+})
+qc.sample.mid <- sapply(strsplit(qc.marker.samples, "_", fixed=TRUE), "[[", 4)
+
+
+
 ### get Dx list
-dx.marker.samples <- samples[grepl("^Dx_Mk_", samples)]
+dx.marker.samples <- samples[grepl("^PC_CAR_", samples)]
 dx.marker.files <- paste(folder, files[names(dx.marker.samples)], sep=separator)
 dx.sample.sid <- sapply(strsplit(dx.marker.samples, "_", fixed=TRUE), "[[", 3)
 dx.sample.pid <- sapply(dx.sample.sid, function(x) {
@@ -291,8 +311,13 @@ dx.sample.mid <- sapply(strsplit(dx.marker.samples, "_", fixed=TRUE), "[[", 4)
 dx.sample.ng <- as.numeric(gsub("ng", "", sapply(strsplit(dx.marker.samples, "_", fixed=TRUE), "[[", 5)))
 
 
+
+
+
+
+
 ### get fu list
-fu.marker.samples <- samples[grepl("^FU_Mk_", samples)]
+fu.marker.samples <- samples[grepl("^FU_CAR_", samples)]
 fu.marker.files <- paste(folder, files[names(fu.marker.samples)], sep=separator)
 fu.sample.sid <- sapply(strsplit(fu.marker.samples, "_", fixed=TRUE), "[[", 3)
 fu.sample.pid <- sapply(fu.sample.sid, function(x) {
@@ -305,7 +330,7 @@ fu.sample.ng <- as.numeric(gsub("ng", "", sapply(strsplit(fu.marker.samples, "_"
 
 
 ### get MNC marker list
-mnc.marker.samples <- samples[grepl("^MNC_Mk_", samples)]
+mnc.marker.samples <- samples[grepl("^MNC_CAR_", samples)]
 mnc.marker.files <- paste(folder, files[names(mnc.marker.samples)], sep=separator)
 mnc.sample.sid <- sapply(strsplit(mnc.marker.samples, "_", fixed=TRUE), "[[", 3)
 mnc.sample.pid <- sapply(mnc.sample.sid, function(x) {
@@ -316,7 +341,7 @@ mnc.sample.mid <- sapply(strsplit(mnc.marker.samples, "_", fixed=TRUE), "[[", 4)
 mnc.sample.ng <- as.numeric(gsub("ng", "", sapply(strsplit(mnc.marker.samples, "_", fixed=TRUE), "[[", 5)))
 
 ### get H2O marker list
-h2o.marker.samples <- samples[grepl("^H2O_Mk_", samples)]
+h2o.marker.samples <- samples[grepl("^H2O_CAR_", samples)]
 h2o.marker.files <- paste(folder, files[names(h2o.marker.samples)], sep=separator)
 h2o.sample.sid <- sapply(strsplit(h2o.marker.samples, "_", fixed=TRUE), "[[", 3)
 h2o.sample.pid <- sapply(h2o.sample.sid, function(x) {
@@ -358,7 +383,6 @@ alb.results.individual <- lapply(1:length(alb.samples), function(i) {
 
 	ff <- alb.files[i]
 
-	print(ff)
 	
 	alb.int <- read.csv(ff, header=TRUE)
 	alb.int <- alb.int[sample(nrow(alb.int)), ]
@@ -437,6 +461,7 @@ cat("Analyzing marker wells...\n")
 
 dx.sample.clust <- lapply(1:length(dx.marker.samples), function(i) {
 	ff <- dx.marker.files[i]
+
 	
 	pid <- dx.sample.pid[i]
 	dx.sid <- dx.sample.sid[i]
@@ -612,28 +637,19 @@ dx.sample.clust <- lapply(1:length(dx.marker.samples), function(i) {
 	
 	
 	fu.sids <- unique(fu.sample.sid[fu.sample.pid == pid & fu.sample.mid == mid])
+
+
+
+
+
+
+
+
+
 	
 	
 	for (fu.sid in fu.sids) {
 	
-		#dx.baseline <- readline(prompt = paste("Processing ", fu.sid, "_", mid, ". Please key in the Dx Baseline value or hit enter to use in-plate Dx baseline.\n", sep=""))
-		#dx.baseline <- as.numeric(dx.baseline)
-
-		if (runType == "relative") {
-		
-				cat(paste("Processing ", fu.sid, "_", mid, ". Please key in the tumour load at Dx or hit enter to use the value calculated from the current test.\n", sep=""));
-				dx.baseline <- trimws(readLines("stdin",n=1))
-				dx.baseline <- as.numeric(dx.baseline)
-				if(is.na(dx.baseline)) {
-					cat("Using in-plate Dx baseline.\n")
-				} else {
-					cat("Using user specified Dx baseline.\n")
-				
-				}
-
-		} else {
-			dx.baseline <- 0
-		}
 		
 		fu.samples <- fu.marker.samples[fu.sample.pid == pid & fu.sample.mid == mid & fu.sample.sid == fu.sid]
 		fu.files <- fu.marker.files[fu.sample.pid == pid & fu.sample.mid == mid & fu.sample.sid == fu.sid]
@@ -692,6 +708,9 @@ dx.sample.clust <- lapply(1:length(dx.marker.samples), function(i) {
 		fu.marker <- fu.results
 		mnc.marker <- mnc.results
 		h2o.marker <- h2o.results
+
+
+
 		
 		## draw figure 
 		render("./ddPCR_rTemplate_report.Rmd", params = list(
@@ -706,7 +725,8 @@ dx.sample.clust <- lapply(1:length(dx.marker.samples), function(i) {
 			mnc.marker=mnc.marker, 
 			h2o.marker=h2o.marker, 
 			show_outliers=show_outliers, 
-			dx.baseline=dx.baseline, 
+			mnc_baseline=mnc_baseline,
+			manual_mnc_baseline=manual_mnc_baseline,
 			mnc.alb.dilutionX=mnc.alb.dilutionX, 
 			mnc.alb.concentration=mnc.alb.concentration, 
 			run_by=run_by, 
@@ -732,7 +752,6 @@ dx.sample.clust <- lapply(1:length(dx.marker.samples), function(i) {
 			mnc.marker=mnc.marker, 
 			h2o.marker=h2o.marker, 
 			show_outliers=show_outliers, 
-			dx.baseline=dx.baseline, 
 			mnc.alb.dilutionX=mnc.alb.dilutionX, 
 			mnc.alb.concentration=mnc.alb.concentration, 
 			date=Sys.time()), 
@@ -741,11 +760,7 @@ dx.sample.clust <- lapply(1:length(dx.marker.samples), function(i) {
 	
 	}
 	
-	#msk <- rep(FALSE, nrow(dx.marker.int))
-	
-	#msk[to.exclude] <- TRUE
-	#dx.marker.clust <- clustering_and_threshold(dx.marker.int[!msk, marker.channel])
-	#list(dx.marker.int, dx.marker.clust, to.exclude)
+
 	
 })
 
