@@ -101,7 +101,7 @@ manual_clustering_and_threshold <- function(intensities, threshold) {
 
 
 ##### load sample sheet
-sample_sheet_file <- "/home/dungnt/Documents/Repository/ddPCR_CAR/D1593Bd CAR19/layout.txt"
+sample_sheet_file <- file.choose(new = FALSE)
 
 folder <- dirname(sample_sheet_file)
 
@@ -536,6 +536,65 @@ dx.sample.clust <- lapply(1:length(dx.marker.samples), function(i) {
 						concentration=concentration, 
 						name=dx.marker.samples[i], 
 						n.outliers = n.outliers))
+ 	
+
+	##QC
+
+
+	qc.samples <- qc.marker.samples[qc.sample.pid == pid & qc.sample.mid == mid]
+
+	qc.files <- qc.marker.files[qc.sample.pid == pid & qc.sample.mid == mid]
+	
+	qc.results <- lapply(1:length(qc.samples), function(j) {
+		qc.file <- paste(folder, files[names(qc.samples)[j]], sep=separator)
+		qc.marker.int <- read.csv(qc.file, header=TRUE)
+		qc.marker.int <- qc.marker.int[sample(nrow(qc.marker.int)), ]
+
+
+		qc.mask <- (qc.marker.int[, alb.channel] < outlier.in.silence.channel$upper.bound) & (qc.marker.int[, alb.channel] > outlier.in.silence.channel$lower.bound) & (qc.marker.int[, marker.channel] < dx.marker.clust2$upper.bound)
+		
+		
+		if (!silence) {
+		
+			## get plot range
+			x.min <- min(c(qc.marker.int[, marker.channel], dx.marker.int[, marker.channel]))
+			x.max <- max(c(qc.marker.int[, marker.channel], dx.marker.int[, marker.channel]))
+			y.min <- min(c(qc.marker.int[, alb.channel], dx.marker.int[, alb.channel]))
+			y.max <- max(c(qc.marker.int[, alb.channel], dx.marker.int[, alb.channel]))
+			
+			
+			plot(qc.marker.int[,marker.channel], qc.marker.int[,alb.channel], col = (qc.marker.int[,marker.channel] > dx.marker.clust2$threshold) + 1,
+					pch = c(4, 16)[qc.mask + 1],
+					main=paste(qc.samples[j], names(qc.samples)[j], "\n Click to remove, and click the middle key when done." ), xlab = "Channel 1", ylab="Channel 2", xlim=c(x.min, x.max), ylim=c(y.min, y.max))
+			lines(c(dx.marker.clust2$threshold, dx.marker.clust2$threshold), c(-1e8, 1e8), col=2, lwd=1.5)
+			qc.to.inverse <- identify(qc.marker.int[,1], qc.marker.int[,2], c("✓", "x")[qc.mask + 1], col="blue")
+			qc.mask[qc.to.inverse] <- !qc.mask[qc.to.inverse]
+		}
+		n.positive.droplets <- sum(qc.marker.int[,marker.channel][qc.mask] > dx.marker.clust2$threshold)
+		n.droplets <- sum(qc.mask)
+		n.outliers <- sum(!qc.mask)
+		concentration <- -log(1-(n.positive.droplets/n.droplets))/0.00085
+	
+		list(intensities=qc.marker.int, 
+						threshold=dx.marker.clust2$threshold, 
+						mask=qc.mask, 
+						n.positive.droplets=n.positive.droplets, 
+						n.droplets = n.droplets, 
+						concentration=concentration, 
+						name=qc.samples[j],   
+						n.outliers = n.outliers)
+	})
+
+
+	qc.concentration <- qc.results[[1]]$concentration
+
+
+
+
+
+
+
+
 	## MNC marker files
 	mnc.samples <- mnc.marker.samples[mnc.sample.pid == pid & mnc.sample.mid == mid]
 	mnc.files <- mnc.marker.files[mnc.sample.pid == pid & mnc.sample.mid == mid]
@@ -736,6 +795,7 @@ dx.sample.clust <- lapply(1:length(dx.marker.samples), function(i) {
 			runType=runType,
 			is_manual_threshold=is_manual_threshold, 
 			manual_threshold=manual_threshold,
+			qc.concentration=qc.concentration,
 			date=Sys.time()), 
 			output_file = paste(folder, separator, fu.sid, "_", mid, "_", runmode, "_report.pdf", sep="")
 		)

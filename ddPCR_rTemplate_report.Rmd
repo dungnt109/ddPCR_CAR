@@ -26,6 +26,7 @@ params:
   verifier: ""
   is_manual_threshold: FALSE
   manual_threshold: 0
+  qc.concentration: 0
 title: "ddPCR laboratory results"
 fontsize: 10pt
 geometry: margin=1.5cm
@@ -50,7 +51,7 @@ header-includes:
 \fancypagestyle{plain}{%
   \renewcommand{\headrulewidth}{0pt}%
   \fancyhf{}%
-  \fancyfoot[C]{\footnotesize Page \thepage\, of\, \pageref*{LastPage} `r params$sid` `r params$mid` Generated at `r params$date` by ddPCR MRD Pipeline Version 3.0, 17 Jul 2023}
+  \fancyfoot[C]{\footnotesize Page \thepage\, of\, \pageref*{LastPage} `r params$sid` `r params$mid` Generated at `r params$date` by ddPCR CAR Pipeline Version 1.0, 29 Aug 2024}
   \setlength\footskip{0pt}
 }
 \pagestyle{plain}
@@ -159,7 +160,7 @@ get_merged_info <- function(multiwell.results, sample.names=NA) {
 # CAR Results
 
 ```{r fig2, fig.height=7, fig.width=12, fig.align="center", echo=FALSE}
-plot1d(c(params$dx.marker, params$mnc.marker, params$h2o.marker, params$fu.marker),1, main="Intensities and annotation of marker wells")
+plot1d(c(params$dx.marker, params$mnc.marker, params$h2o.marker, params$fu.marker),1, main="Intensities and annotation of CAR wells")
 marker.info <- get_info(c(params$dx.marker, params$mnc.marker, params$h2o.marker, params$fu.marker))
 marker.merged.info <- get_merged_info(c(params$dx.marker, params$mnc.marker, params$h2o.marker, params$fu.marker))
 kable(marker.info, caption = "Per well summary of CAR results")
@@ -236,11 +237,11 @@ if (min.fu.alb.conc.perwell < 2000){
 
 
 ## controls for marker
-### positive marker control >=10
+### positive marker control >=5
 dx.marker.info.perwell <- get_info(c(params$dx.marker))
 min.dx.marker.con.perwell <- min(dx.marker.info.perwell[, "concentration"])
 min.dx.marker.con.perwell.formatted <- sprintf("%#.2f", min.dx.marker.con.perwell)
-min.dx.marker.con.perwell.status <- c("\\textcolor{red}{WARNING}", "\\textcolor{darkgreen}{PASS}")[(min.dx.marker.con.perwell >= 10) + 1]
+min.dx.marker.con.perwell.status <- c("\\textcolor{red}{WARNING}", "\\textcolor{darkgreen}{PASS}")[(min.dx.marker.con.perwell >= 5) + 1]
 
 #### Negative control just indicate value
 #mnc.marker.info.perwell <- get_info(c(params$mnc.marker))
@@ -305,28 +306,30 @@ QC.status <- c(min.events.per.well.status,
 &  `r format(min.events.per.well, scientific = FALSE)`  
 &  `r min.events.per.well.status` \\
 
-2. Minimum FU [1000ng] ALB Conc. 
+2. Minimum FU ALB Conc. 
 &  >10000 copies/uL (GOOD) \newline 2000-10000 copies/uL (ACCEPTABLE) \newline <2000 copies/uL (POOR)       
 & `r value1`  \leavevmode\newline `r value2`  \leavevmode\newline `r value3` 
 & `r status1` \leavevmode\newline `r status2` \leavevmode\newline `r status3`   \\
 
-3. Assay Controls for Marker Assay 
-\newline \hspace*{0.3cm}- Positive (Dx [10ng]) Marker Conc. 
-\newline \hspace*{0.3cm}- NTC (H2O) Marker Conc. 
-& \leavevmode\newline $\ge$10 copies/uL \newline $\le$0.1 copies/uL 
+3. Assay Controls for CAR Assay 
+\newline \hspace*{0.3cm}- PC CAR Conc. 
+\newline \hspace*{0.3cm}- NTC (H2O) CAR Conc. 
+& \leavevmode\newline $\ge$5 copies/uL \newline $\le$0.1 copies/uL 
 & \leavevmode\newline `r min.dx.marker.con.perwell.formatted` 
              \newline `r max.h2o.marker.con.perwell.formatted` 
 & \leavevmode\newline `r min.dx.marker.con.perwell.status`    
              \newline `r max.h2o.marker.con.perwell.status` \\
 
 4. Assay Controls for Albumin Assay 
-\newline \hspace*{0.3cm}- Positive (MNC [5ng]) ALB Conc. 
+\newline \hspace*{0.3cm}- MNC (diluted) ALB Conc. 
 \newline \hspace*{0.3cm}- NTC (H2O) ALB Conc.
 & \leavevmode\newline $\ge$50 copies/uL \newline $\le$0.1 copies/uL 
 & \leavevmode\newline `r min.mnc.alb.con.perwell.formatted` 
              \newline `r max.h2o.alb.con.perwell.formatted` 
 & \leavevmode\newline `r min.mnc.alb.con.perwell.status`    
              \newline `r max.h2o.alb.con.perwell.status` \\
+
+5. LPC concentration (copies/uL) & & `r sprintf("%#.2f", qc.concentration)` & \\
 
 \hline
 
@@ -370,16 +373,27 @@ writeLines(paste(lineNum, ". Using MNC dilution factor ", params$mnc.alb.dilutio
 
 
 
+# CAR in mnc
+mnc.marker.info <- get_merged_info(c(params$mnc.marker))
+
+if (mnc.marker.info[1, "positive"] > 0) {
+
+	mnc.marker.info[1, "concentration"] <- -log(1-(mnc.marker.info[1, "positive"]/mnc.marker.info[1, "used.events"]))/0.00085
+
+	lineNum <- lineNum + 1
+	writeLines(paste(lineNum, ". Warning! Positive event(s) found in MNC.", sep=""))
+
+}
 
 
-# mrd in mnc
+
+# CAR in mnc
 mnc.marker.info <- get_merged_info(c(params$mnc.marker))
 
 if (mnc.marker.info[1, "positive"] == 0) {
 	mnc.marker.info[1, "positive"] <- 1
 	mnc.marker.info[1, "concentration"] <- -log(1-(mnc.marker.info[1, "positive"]/mnc.marker.info[1, "used.events"]))/0.00085
-	lineNum <- lineNum + 1
-	writeLines(paste(lineNum, ". No positive event of marker observed in MNC wells. 1 positive event assumed.", sep=""))
+	
 }
 
 mnc.alb.info <- get_merged_info(c(params$mnc.alb))
@@ -419,6 +433,31 @@ absolute.ptv.formatted <- formatC(absolute.ptv, format = "E", digits = 2)
 absolute.ntv.formatted <- formatC(absolute.ntv, format = "E", digits = 2)
 background.level.formatted <- formatC(background.level, format = "E", digits = 2)
 
+
+
+if (params$manual_mnc_baseline == TRUE) {
+	
+	lineNum <- lineNum + 1
+	writeLines(paste(lineNum, 
+	                 ". Using preset CAR/ALB baseline ratio in MNC for ", 
+	                 params$mid, 
+	                 " ", 
+	                 background.level.formatted, 
+	                 ".", sep="")
+	                 )
+
+} else {
+	
+	lineNum <- lineNum + 1
+	writeLines(paste(lineNum, ". Using calculated CAR/ALB baseline ratio in MNC for"
+					params$mid, 
+	                " ", 
+	                background.level.formatted,
+	                ".",
+	                 sep=""))
+}
+
+
 if (params$runType == "absolute") {
 
 
@@ -434,23 +473,25 @@ if (params$runType == "absolute") {
 
 		mrd.output.values <- c(fu.marker.formatted, 
 					   		   fu.alb.concentration.formatted, 
+					   		   "", 
 					           absolute.mrd.formatted,  
 
 					           absolute.ptv.formatted, 
 					           absolute.ntv.formatted, 
+					           "", 
 			                   
-					           background.level.formatted, 
 					           total.cell.no,  
 					           mrd.call)
 
 		names(mrd.output.values) <- c("FU CAR (copies/uL)", 
 		                              "FU ALB (copies/uL)", 
+		                              "", 
 		                              "Absolute CAR", 
 
 		                              "Absolute PTV",
 		                              "Absolute NTV", 
+		                              "", 
 			                          
-		                              "MNC Baseline", 
 		                              "Assessable GE Numbers", 
 		                              "Call")
 
