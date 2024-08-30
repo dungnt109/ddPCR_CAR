@@ -449,7 +449,7 @@ if (params$manual_mnc_baseline == TRUE) {
 } else {
 	
 	lineNum <- lineNum + 1
-	writeLines(paste(lineNum, ". Using calculated CAR/ALB baseline ratio in MNC for"
+	writeLines(paste(lineNum, ". Using calculated CAR/ALB baseline ratio in MNC for", 
 					params$mid, 
 	                " ", 
 	                background.level.formatted,
