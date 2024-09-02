@@ -758,7 +758,7 @@ dx.sample.clust <- lapply(1:length(dx.marker.samples), function(i) {
 		})
 		
 		
-		dx.alb <- alb.results.individual[alb.samples.info[1,] == "Dx" &  alb.samples.info[3,] == dx.sid]
+		dx.alb <- alb.results.individual[alb.samples.info[1,] == "PC"]
 		fu.alb <- alb.results.individual[alb.samples.info[1,] == "FU" &  alb.samples.info[3,] == fu.sid]
 		mnc.alb <- alb.results.individual[alb.samples.info[1,] == "MNC"]
 		h2o.alb <- alb.h2o.results.individual
