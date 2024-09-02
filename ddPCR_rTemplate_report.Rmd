@@ -366,7 +366,7 @@ if (is_manual_threshold){
 
 
 lineNum <- lineNum + 1
-writeLines(paste(lineNum, ". Using MNC Albumin concentration ", params$mnc.alb.concentration, sep=""))
+writeLines(paste(lineNum, ". Using preset MNC Albumin concentration ", params$mnc.alb.concentration, sep=""))
 
 lineNum <- lineNum + 1
 writeLines(paste(lineNum, ". Using MNC dilution factor ", params$mnc.alb.dilutionX, sep=""))
@@ -449,7 +449,7 @@ if (params$manual_mnc_baseline == TRUE) {
 } else {
 	
 	lineNum <- lineNum + 1
-	writeLines(paste(lineNum, ". Using calculated CAR/ALB baseline ratio in MNC for", 
+	writeLines(paste(lineNum, ". Using calculated CAR/ALB baseline ratio in MNC for ", 
 					params$mid, 
 	                " ", 
 	                background.level.formatted,
